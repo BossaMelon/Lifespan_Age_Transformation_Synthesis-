@@ -1,15 +1,14 @@
 ### Copyright (C) 2020 Roy Or-El. All rights reserved.
 ### Licensed under the CC BY-NC-SA 4.0 license (https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode).
+import functools
+from math import sqrt
+
 import torch
 import torch.nn as nn
-import torch.nn.init as init
 import torch.nn.functional as F
-import functools
-from torch.autograd import grad as Grad
+import torch.nn.init as init
 from torch.autograd import Function
-import numpy as np
-from math import sqrt
-from pdb import set_trace as st
+
 
 ###############################################################################
 # Functions
@@ -45,12 +44,12 @@ def get_norm_layer(norm_type='instance'):
         raise NotImplementedError('normalization layer [%s] is not found' % norm_type)
     return norm_layer
 
+
 def define_G(input_nc, output_nc, ngf, n_downsample_global=2,
              id_enc_norm='pixel', gpu_ids=[], padding_type='reflect',
              style_dim=50, init_type='gaussian',
              conv_weight_norm=False, decoder_norm='pixel', activation='lrelu',
              adaptive_blocks=4, normalize_mlp=False, modulated_conv=False):
-
     id_enc_norm = get_norm_layer(norm_type=id_enc_norm)
 
     netG = Generator(input_nc, output_nc, ngf, n_downsampling=n_downsample_global,
@@ -61,27 +60,28 @@ def define_G(input_nc, output_nc, ngf, n_downsample_global=2,
 
     print(netG)
     if len(gpu_ids) > 0:
-        assert(torch.cuda.is_available())
+        assert (torch.cuda.is_available())
         netG.cuda(gpu_ids[0])
 
     netG.apply(weights_init(init_type))
 
     return netG
 
+
 def define_D(input_nc, ndf, n_layers=6, numClasses=2, gpu_ids=[],
              init_type='gaussian'):
-
     netD = StyleGANDiscriminator(input_nc, ndf=ndf, n_layers=n_layers,
                                  numClasses=numClasses)
 
     print(netD)
     if len(gpu_ids) > 0:
-        assert(torch.cuda.is_available())
+        assert (torch.cuda.is_available())
         netD.cuda(gpu_ids[0])
 
     netD.apply(weights_init('gaussian'))
 
     return netD
+
 
 def print_network(net):
     if isinstance(net, list):
@@ -115,7 +115,7 @@ class FeatureConsistency(nn.Module):
     def __init__(self):
         super(FeatureConsistency, self).__init__()
 
-    def __call__(self,input,target):
+    def __call__(self, input, target):
         return torch.mean(torch.abs(input - target))
 
 
@@ -155,6 +155,7 @@ class SelectiveClassesNonSatGANLoss(nn.Module):
 
         return loss
 
+
 ##############################################################################
 # Generator
 ##############################################################################
@@ -189,6 +190,7 @@ def equal_lr(module, name='weight'):
 
     return module
 
+
 class PixelNorm(nn.Module):
     def __init__(self, num_channels=None):
         super().__init__()
@@ -198,8 +200,10 @@ class PixelNorm(nn.Module):
     def forward(self, input):
         return input / torch.sqrt(torch.mean(input ** 2, dim=1, keepdim=True) + 1e-5)
 
+
 class ModulatedConv2d(nn.Module):
-    def __init__(self, fin, fout, kernel_size, padding_type='reflect', upsample=False, downsample=False, latent_dim=256, normalize_mlp=False):
+    def __init__(self, fin, fout, kernel_size, padding_type='reflect', upsample=False, downsample=False, latent_dim=256,
+                 normalize_mlp=False):
         super(ModulatedConv2d, self).__init__()
         self.in_channels = fin
         self.out_channels = fout
@@ -256,8 +260,8 @@ class ModulatedConv2d(nn.Module):
         if self.downsample:
             input = self.blur(input)
 
-        b,_,h,w = input.shape
-        input = input.view(1,-1,h,w)
+        b, _, h, w = input.shape
+        input = input.view(1, -1, h, w)
         input = self.padding(input)
         out = self.conv(input, weight, groups=b).view(b, self.out_channels, h, w) + self.bias
 
@@ -268,6 +272,7 @@ class ModulatedConv2d(nn.Module):
             out = self.blur(out)
 
         return out
+
 
 class EqualConv2d(nn.Module):
     def __init__(self, *args, **kwargs):
@@ -295,6 +300,7 @@ class EqualLinear(nn.Module):
     def forward(self, input):
         return self.linear(input)
 
+
 class BlurFunctionBackward(Function):
     @staticmethod
     def forward(ctx, grad_output, kernel, kernel_flip):
@@ -316,6 +322,7 @@ class BlurFunctionBackward(Function):
 
         return grad_input, None, None
 
+
 class BlurFunction(Function):
     @staticmethod
     def forward(ctx, input, kernel, kernel_flip):
@@ -333,7 +340,9 @@ class BlurFunction(Function):
 
         return grad_input, None, None
 
+
 blur = BlurFunction.apply
+
 
 class Blur(nn.Module):
     def __init__(self, channel):
@@ -350,9 +359,10 @@ class Blur(nn.Module):
     def forward(self, input):
         return blur(input, self.weight, self.weight_flip)
 
+
 class MLP(nn.Module):
     def __init__(self, input_dim, out_dim, fc_dim, n_fc,
-                 weight_norm=False, activation='relu', normalize_mlp=False):#, pixel_norm=False):
+                 weight_norm=False, activation='relu', normalize_mlp=False):  # , pixel_norm=False):
         super(MLP, self).__init__()
         if weight_norm:
             linear = EqualLinear
@@ -360,7 +370,7 @@ class MLP(nn.Module):
             linear = nn.Linear
 
         if activation == 'lrelu':
-            actvn = nn.LeakyReLU(0.2,True)
+            actvn = nn.LeakyReLU(0.2, True)
         elif activation == 'blrelu':
             actvn = BidirectionalLeakyReLU()
         else:
@@ -373,7 +383,7 @@ class MLP(nn.Module):
         if normalize_mlp:
             self.model += [PixelNorm()]
 
-         # set the first layer
+        # set the first layer
         self.model += [linear(input_dim, fc_dim),
                        actvn]
         if normalize_mlp:
@@ -387,7 +397,7 @@ class MLP(nn.Module):
                 self.model += [PixelNorm()]
 
         # set the last layer
-        self.model += [linear(fc_dim, out_dim)] # no output activations
+        self.model += [linear(fc_dim, out_dim)]  # no output activations
 
         # normalize output
         if normalize_mlp:
@@ -398,6 +408,7 @@ class MLP(nn.Module):
     def forward(self, input):
         out = self.model(input)
         return out
+
 
 class StyledConvBlock(nn.Module):
     def __init__(self, fin, fout, latent_dim=256, padding='reflect', upsample=False, downsample=False,
@@ -427,7 +438,7 @@ class StyledConvBlock(nn.Module):
         if actvn == 'relu':
             activation = nn.ReLU(True)
         else:
-            activation = nn.LeakyReLU(0.2,True)
+            activation = nn.LeakyReLU(0.2, True)
 
         if self.downsample:
             self.downsampler = nn.AvgPool2d(2)
@@ -466,7 +477,7 @@ class StyledConvBlock(nn.Module):
 
     def forward(self, input, latent=None):
         if self.modulated_conv:
-            out = self.conv0(input,latent)
+            out = self.conv0(input, latent)
         else:
             out = self.conv0(input)
 
@@ -475,7 +486,7 @@ class StyledConvBlock(nn.Module):
             out = self.pxl_norm0(out)
 
         if self.modulated_conv:
-            out = self.conv1(out,latent)
+            out = self.conv1(out, latent)
         else:
             out = self.conv1(out)
 
@@ -485,11 +496,12 @@ class StyledConvBlock(nn.Module):
 
         return out
 
+
 class IdentityEncoder(nn.Module):
     def __init__(self, input_nc, ngf=64, n_downsampling=3, n_blocks=7,
                  norm_layer=PixelNorm, padding_type='reflect',
                  conv_weight_norm=False, actvn='relu'):
-        assert(n_blocks >= 0)
+        assert (n_blocks >= 0)
         super(IdentityEncoder, self).__init__()
 
         if padding_type == 'reflect':
@@ -510,13 +522,13 @@ class IdentityEncoder(nn.Module):
         encoder = [padding_layer(3), conv2d(input_nc, ngf, kernel_size=7, padding=0), norm_layer(ngf), activation]
         ### downsample
         for i in range(n_downsampling):
-            mult = 2**i
+            mult = 2 ** i
             encoder += [padding_layer(1),
                         conv2d(ngf * mult, ngf * mult * 2, kernel_size=3, stride=2, padding=0),
                         norm_layer(ngf * mult * 2), activation]
 
         ### resnet blocks
-        mult = 2**n_downsampling
+        mult = 2 ** n_downsampling
         for i in range(n_blocks):
             encoder += [ResnetBlock(ngf * mult, padding_type=padding_type, activation=activation,
                                     norm_layer=norm_layer, conv_weight_norm=conv_weight_norm)]
@@ -525,6 +537,11 @@ class IdentityEncoder(nn.Module):
 
     def forward(self, input):
         return self.encoder(input)
+
+    # TODO
+    def summary(self):
+        pass
+
 
 class AgeEncoder(nn.Module):
     def __init__(self, input_nc, ngf=64, n_downsampling=4, style_dim=50, padding_type='reflect',
@@ -549,7 +566,7 @@ class AgeEncoder(nn.Module):
         encoder = [padding_layer(3), conv2d(input_nc, ngf, kernel_size=7, padding=0), activation]
         ### downsample
         for i in range(n_downsampling):
-            mult = 2**i
+            mult = 2 ** i
             encoder += [padding_layer(1),
                         conv2d(ngf * mult, ngf * mult * 2, kernel_size=3, stride=2, padding=0),
                         activation]
@@ -563,6 +580,7 @@ class AgeEncoder(nn.Module):
         latent = features.mean(dim=3).mean(dim=2)
         return latent
 
+
 class StyledDecoder(nn.Module):
     def __init__(self, output_nc, ngf=64, style_dim=50, latent_dim=256, n_downsampling=2,
                  padding_type='reflect', actvn='lrelu', use_tanh=True, use_pixel_norm=False,
@@ -573,7 +591,7 @@ class StyledDecoder(nn.Module):
         else:
             padding_layer = nn.ZeroPad2d
 
-        mult = 2**n_downsampling
+        mult = 2 ** n_downsampling
         last_upconv_out_layers = ngf * mult // 4
 
         self.StyledConvBlock_0 = StyledConvBlock(ngf * mult, ngf * mult, latent_dim=latent_dim,
@@ -617,7 +635,7 @@ class StyledDecoder(nn.Module):
     def forward(self, id_features, target_age=None, traverse=False, deploy=False, interp_step=0.5):
         if target_age is not None:
             if traverse:
-                alphas = torch.arange(1,0,step=-interp_step).view(-1,1).cuda()
+                alphas = torch.arange(1, 0, step=-interp_step).view(-1, 1).cuda()
                 interps = len(alphas)
                 orig_class_num = target_age.shape[0]
                 output_classes = interps * (orig_class_num - 1) + 1
@@ -629,13 +647,14 @@ class StyledDecoder(nn.Module):
             latent = None
 
         if traverse:
-            id_features = id_features.repeat(output_classes,1,1,1)
-            for i in range(orig_class_num-1):
-                latent[interps*i:interps*(i+1), :] = alphas * temp_latent[i,:] + (1 - alphas) * temp_latent[i+1,:]
-            latent[-1,:] = temp_latent[-1,:]
+            id_features = id_features.repeat(output_classes, 1, 1, 1)
+            for i in range(orig_class_num - 1):
+                latent[interps * i:interps * (i + 1), :] = alphas * temp_latent[i, :] + (1 - alphas) * temp_latent[
+                                                                                                       i + 1, :]
+            latent[-1, :] = temp_latent[-1, :]
         elif deploy:
             output_classes = target_age.shape[0]
-            id_features = id_features.repeat(output_classes,1,1,1)
+            id_features = id_features.repeat(output_classes, 1, 1, 1)
 
         out = self.StyledConvBlock_0(id_features, latent)
         out = self.StyledConvBlock_1(out, latent)
@@ -647,6 +666,7 @@ class StyledDecoder(nn.Module):
 
         return out
 
+
 class Generator(nn.Module):
     def __init__(self, input_nc, output_nc, ngf=64, style_dim=50, n_downsampling=2,
                  n_blocks=4, adaptive_blocks=4, id_enc_norm=PixelNorm,
@@ -656,7 +676,7 @@ class Generator(nn.Module):
         super(Generator, self).__init__()
         self.id_encoder = IdentityEncoder(input_nc, ngf, n_downsampling, n_blocks, id_enc_norm,
                                           padding_type, conv_weight_norm=conv_weight_norm,
-                                          actvn='relu') # replacing relu with leaky relu here causes nans and the entire training to collapse immediately
+                                          actvn='relu')  # replacing relu with leaky relu here causes nans and the entire training to collapse immediately
         self.age_encoder = AgeEncoder(input_nc, ngf=ngf, n_downsampling=4, style_dim=style_dim,
                                       padding_type=padding_type, actvn=actvn,
                                       conv_weight_norm=conv_weight_norm)
@@ -678,11 +698,12 @@ class Generator(nn.Module):
 
     def decode(self, id_features, target_age_features, traverse=False, deploy=False, interp_step=0.5):
         if torch.is_tensor(id_features):
-            return self.decoder(id_features, target_age_features, traverse=traverse, deploy=deploy, interp_step=interp_step)
+            return self.decoder(id_features, target_age_features, traverse=traverse, deploy=deploy,
+                                interp_step=interp_step)
         else:
             return None
 
-    #parallel forward
+    # parallel forward
     def forward(self, input, target_age_code, cyc_age_code, source_age_code, disc_pass=False):
         orig_id_features = self.id_encoder(input)
         orig_age_features = self.age_encoder(input)
@@ -702,11 +723,11 @@ class Generator(nn.Module):
             cyc_out = self.decode(fake_id_features, cyc_age_code)
         return rec_out, gen_out, cyc_out, orig_id_features, orig_age_features, fake_id_features, fake_age_features
 
-
     def infer(self, input, target_age_features, traverse=False, deploy=False, interp_step=0.5):
         id_features = self.id_encoder(input)
         out = self.decode(id_features, target_age_features, traverse=traverse, deploy=deploy, interp_step=interp_step)
         return out
+
 
 # Define a resnet block
 class ResnetBlock(nn.Module):
@@ -759,6 +780,7 @@ class ResnetBlock(nn.Module):
         out = x + self.conv_block(x)
         return out
 
+
 ##############################################################################
 # Discriminator
 ##############################################################################
@@ -771,7 +793,7 @@ class StyleGANDiscriminator(nn.Module):
         else:
             padding_layer = nn.ZeroPad2d
 
-        activation = nn.LeakyReLU(0.2,True)
+        activation = nn.LeakyReLU(0.2, True)
 
         sequence = [padding_layer(0), EqualConv2d(input_nc, ndf, kernel_size=1), activation]
 
@@ -784,7 +806,7 @@ class StyleGANDiscriminator(nn.Module):
         self.model = nn.Sequential(*sequence)
 
         output_nc = numClasses
-        self.gan_head = nn.Sequential(padding_layer(1), EqualConv2d(nf+1, nf, kernel_size=3), activation,
+        self.gan_head = nn.Sequential(padding_layer(1), EqualConv2d(nf + 1, nf, kernel_size=3), activation,
                                       EqualConv2d(nf, output_nc, kernel_size=4), activation)
 
     def minibatch_stdev(self, input):

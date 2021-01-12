@@ -1,9 +1,11 @@
 ### Copyright (C) 2020 Roy Or-El. All rights reserved.
 ### Licensed under the CC BY-NC-SA 4.0 license (https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode).
 import os
+import sys
+
 import torch
 import torch.nn as nn
-import sys
+
 
 class BaseModel(torch.nn.Module):
     def name(self):
@@ -45,7 +47,7 @@ class BaseModel(torch.nn.Module):
     def save_network(self, network, network_label, epoch_label, gpu_ids):
         save_filename = '%s_net_%s.pth' % (epoch_label, network_label)
         save_path = os.path.join(self.save_dir, save_filename)
-        if isinstance(network,nn.DataParallel):
+        if isinstance(network, nn.DataParallel):
             torch.save(network.module.state_dict(), save_path)
         else:
             torch.save(network.state_dict(), save_path)
@@ -59,16 +61,16 @@ class BaseModel(torch.nn.Module):
         if not os.path.isfile(save_path):
             print('%s not exists yet!' % save_path)
             if 'G' in network_label:
-                raise('Generator must exist!')
+                raise ('Generator must exist!')
         else:
             try:
-                if isinstance(network,nn.DataParallel):
+                if isinstance(network, nn.DataParallel):
                     network.module.load_state_dict(torch.load(save_path))
                 else:
                     network.load_state_dict(torch.load(save_path))
             except:
                 pretrained_dict = torch.load(save_path)
-                if isinstance(network,nn.DataParallel):
+                if isinstance(network, nn.DataParallel):
                     model_dict = network.module.state_dict()
                 else:
                     model_dict = network.state_dict()
@@ -76,14 +78,11 @@ class BaseModel(torch.nn.Module):
                     pretrained_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict}
                     network.load_state_dict(pretrained_dict)
                     if self.opt.verbose:
-                        print('Pretrained network %s has excessive layers; Only loading layers that are used' % network_label)
+                        print(
+                            'Pretrained network %s has excessive layers; Only loading layers that are used' % network_label)
                 except:
                     print('Pretrained network %s has fewer layers; The following are not initialized:' % network_label)
-                    if sys.version_info >= (3,0):
-                        not_initialized = set()
-                    else:
-                        from sets import Set
-                        not_initialized = Set()
+                    not_initialized = set()
                     for k, v in pretrained_dict.items():
                         if v.size() == model_dict[k].size():
                             model_dict[k] = v
@@ -95,5 +94,9 @@ class BaseModel(torch.nn.Module):
                         print(sorted(not_initialized))
                     network.load_state_dict(model_dict)
 
-    def update_learning_rate():
+    def update_learning_rate(self):
         pass
+
+
+if __name__ == '__main__':
+    print(sys.version_info)
