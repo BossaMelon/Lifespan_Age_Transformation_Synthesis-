@@ -1,3 +1,4 @@
 1.create dataset怎么用
+	需要再根目录存在FFHQ-Aging-Dataset/ffhq_aging256x256'，以及label文件
 2.parsings文件夹是什么
 3.landmarks.dat是什么

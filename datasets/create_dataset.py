@@ -76,6 +76,7 @@ def create_dataset(folder, labels_file, train_split):
             else:
                 phase = 'test'
 
+            # 1000张一个sub
             subdir = str(num - (num % 1000)).zfill(5)
             img_filename = os.path.join(folder, subdir, str(num).zfill(5) + '.png')
             if os.path.isfile(img_filename):
@@ -93,7 +94,9 @@ if __name__ == '__main__':
                            help='Location of the raw FFHQ-Aging dataset')
     argparser.add_argument('--train_split', type=int, default=69000, help='number of images to allocate for training')
     args = argparser.parse_args()
-    folder = args.folder
-    labels_file = args.labels_file
+    # image folder
+    folder = '/data/scene_understanding/FFHQ-Aging/FFHQ-Aging-Dataset/ffhq_aging256x256'
+    # a csv label
+    labels_file = '/data/scene_understanding/FFHQ-Aging/FFHQ-Aging-Dataset/ffhq_aging_labels.csv'
     train_split = args.train_split
     create_dataset(folder, labels_file, train_split)
